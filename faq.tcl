@@ -1,7 +1,98 @@
 # Original Script (Diccionario.TCL) by BaRDaHL
-# Changes by ICU <icu@eggdrop-support.org> (#eggdrop.support @ irc.QuakeNet.org)
-# Further changes by DopeGhoti <dopeghoti+eggdrops@gmail.com>
 #
+# by ICU <icu@eggdrop-support.org> (#eggdrop.support @ irc.QuakeNet.org)
+#
+# Further changes by DopeGhoti <dopeghoti@gmail.com>
+#
+# Thanks to #eggdrop.support for all the tips and support :)
+#
+# ChangeLog
+#
+# 20110227 - More flood controls
+#          - Will not repeat the same FAQ with X seconds.
+# 
+# 20110221 - Incorporated deflood.tcl
+#          - Flood controls
+# 
+# 20030106 - Changed Name to faq.tcl (changed purpose)
+#          - Changed some commands
+#	   - Updated the language
+#	   - Added some commands
+#	   - Fixes:)
+#
+# 20030115 - Changed the ?faq helptext
+#	   - Fixed all to key word
+#
+# 20030122 - Removed some private parts from the script (?send-faq) till 
+#	     i found a solution to make it in tcl (not in perl ;-))
+#	   - Changed the way ?faq works. it now uses public replys
+#	     (requested by #eggdrop.support)
+#
+# 20030123 - Some cosmetic changes
+# 
+# 20030219 - Changed matchattr to don't use quotation marks
+#
+# 20030411 - Fixed handling of some special chars in facts/description. 
+#	     Mainly changed listtostring proc.
+#	     Thx to |sPhiNX| for reporting ;)
+#
+# 20030728 - Removed the listtostring proc. 
+#            Format updates
+#            Spelling
+#            Changed matchattr to check for chan M too
+#            Switched the Settings handling
+#            Added configurable cmdchar, splitchar, glob_flag and chan_flag:
+#            cmdchar: char to prefix commands
+#            splitchar: seperator between keyword and definition
+#            glob_flag: globalflag to be a FAQ Master
+#            chan_flag: channelflag to be a FAQ Master
+#            Now using keyword instead of key word
+#            Switched from using "" to \002
+#
+# 20030730 - Fixed the "?faq nick key word" bug (wouldn't notice the second
+#            part of the word)
+#
+# 20030731 - Added the ability to limit the chans where the script is active
+#          - Bugfixes - thanks to AliTriX on #eggdrop.support
+#
+# 20030805 - Last bugfixes and public relase v2.07
+#
+# 20031011 - Honored the latest changes on egghelp.org by slennox
+#
+# 20040122 - Changed the default faq(splitchar) since it causes some trouble 
+#            on TCL 8.4+
+#          - Removed egghelp.org stuff for public release.
+#
+# 20040314 - Using string trim to remove trailing spaces from fact lookups
+#            Thanks to bUrN for reporting
+#
+# 20040629 - Added possibility to use multi-line responses.
+#            Thanks to arena7|Blacky for the idea
+#
+#
+# creates a file in your eggdrop-dir to store facts
+# if you want to modify the faq-database status you need to have the +M flag
+# to set this flag you just need to copy ".chattr <handle> +M" to the partyline
+#
+# The most current Version is available here: http://no-scrub.de/other/faq.tcl.zip
+#
+# Depending on your faq(cmdchar) setting prefix something other then a questionmark
+# Depending on your faq(splitchar) settings use something other then a paragraph sign
+#
+# Public commands:
+# ?faq-help - usage
+# ? keyword - used to look up something from the db
+# ?faq nick keyword - used to explain something(keyword) to someone(nick)
+#
+# Master commands:
+# ?addword keyword§definition - used to add something to the db
+# ?delword keyword - used to delete something from the db
+# ?modify keyword§definition - used to modify a keyword in the db
+# ?open-faq - opens the database if closed
+# ?close-faq - closes the database if opened
+#
+# Flood control:
+# #if {![checkUser $nick $chan]} {return}
 
 ########
 # SETS #
@@ -42,7 +133,14 @@ set flood 4:180
 
 # Flood protection for individual FAQs:
 # Number of seconds withing which to prevent repeat FAQs.
-set toofasttime 10
+set toofasttime 15
+
+# if ![info exists ::lastFAQ] {set ::lastFAQ 0}
+
+#  set max [lindex [split $flood ":"] 0]; set time [lindex [split $flood ":"] 1]
+
+# if {$::lastFAQ >= $max} {set type notice; set dest $nick} \
+# 	else {set type privmsg; set dest $chan}
 
 set toofast(stub) "stub"
 
@@ -57,7 +155,7 @@ set toofast(stub) "stub"
 # Initial Status of the Database (0 = open 1 = closed)
 set faq(status) 0
 # Current Version of the Database
-set faq(version) "20110227 v2011.0217"
+set faq(version) "20110227 v2.17"
 
 #########
 # BINDS #
@@ -75,6 +173,8 @@ bind pub - "[string trim $faq(cmdchar)]open-faq" faq:open-faqdb
 bind pub - "[string trim $faq(cmdchar)]faq-help" faq:faq_howto
 bind pub - "[string trim $faq(cmdchar)]index" faq:faq_index
 #bind pub - "see" faq:explain_fact
+
+bind pub M "[string trim $faq(cmdchar)]!" faq:reset_flood
 
 #########
 # PROCS #
@@ -128,6 +228,10 @@ proc faq:open-faqdb {nick idx handle channel args} {
 	}
 }
 
+proc faq:reset_flood {nick idx handle channel args } {
+	set ::lastFAQ 0
+	putnotc $nick "Flood counter for FAQ DB reset."
+}
 
 proc faq:explain_fact {nick idx handle channel args} {
 	global faq chanflag
